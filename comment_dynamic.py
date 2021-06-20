@@ -12,9 +12,9 @@ class Comment(object):
         self.session = requests.Session()
         self.dynamic_detail = self.get_dynamic_details(dynamic_id)
 
-    def get_comment_uid_list(self, sort=2, ps=49, pn=1, refresh_interval=5, sleep=1, remove_repeat=True):
+    def get_comment_uid_list(self, sort=2, ps=49, counter=1, refresh_interval=5, sleep=1, next_reply=0, remove_repeat=True):
         # Technique to avoid 412
-        if pn % refresh_interval == 0:
+        if counter % refresh_interval == 0:
             time.sleep(sleep)
         # Detect reply type & oid
         dynamic_type = str(self.dynamic_detail['data']['card']['desc']['type'])
@@ -29,7 +29,7 @@ class Comment(object):
             # API - Only Display Main Replies
             # comment_url = 'https://api.bilibili.com/x/v2/reply?type={}&oid={}&sort={}&ps={}&pn={}'.format(type_value, oid, sort, ps, pn)
             # API - Replies with Part of Sub-replies
-            comment_url = 'https://api.bilibili.com/x/v2/reply/main?type={}&oid={}&mode=0&ps={}&next={}'.format(type_value, oid, ps, pn - 1)
+            comment_url = 'https://api.bilibili.com/x/v2/reply/main?type={}&oid={}&mode={}&next={}'.format(type_value, oid, sort, next_reply)
             # Obtain reply for current page
             while True:
                 try:
@@ -49,7 +49,7 @@ class Comment(object):
             # Total Count Approach for API - Only Display Main Replies
             # total_replies = comment_info['data']['page']['count']
             # Total Count Approach for API - Replies with Part of Sub-replies
-            total_replies = comment_info['data']['cursor']['all_count']
+            # total_replies = comment_info['data']['cursor']['all_count']
             uid_list = []
             # Avoid error caused by empty replies
             if reply_list is None:
@@ -57,9 +57,12 @@ class Comment(object):
             # Add UID for each reply
             for reply in reply_list:
                 uid_list.append(reply['mid'])
-            # Check if there is another page
-            if total_replies - ps * pn > 0:
-                uid_list.extend(self.get_comment_uid_list(sort, ps, pn + 1))
+            # Check if there is another page for API - Only Display Main Replies
+            # if total_replies - ps * counter > 0:
+            #     uid_list.extend(self.get_comment_uid_list(sort, ps, counter + 1))
+            next_reply = comment_info['data']['cursor']['next']
+            if next_reply != 1:
+                uid_list.extend(self.get_comment_uid_list(sort, counter=counter+1, next_reply=next_reply))
             if remove_repeat:
                 uid_list = list(set(uid_list))
             return uid_list
